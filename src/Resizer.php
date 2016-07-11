@@ -1,13 +1,12 @@
 <?php
 
-namespace lagbox\resizer;
+namespace lagbox\Resizer;
 
-// switch to full path to facade
-use Image;
-
-use lagbox\Resizable;
-use Illuminate\Config\Repository as Config;
+use lagbox\Resizer\Resizable;
+use Intervention\Image\Facades\Image;
+use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Filesystem\Factory as Storage;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class Resizer
 {
@@ -17,6 +16,8 @@ class Resizer
 
     protected $queueIt;
 
+    protected $formatter;
+
     public static $sizes = [
         'lg' => 600,
         'md' => 400,
@@ -25,7 +26,6 @@ class Resizer
     ];
 
     /**
-     *
      * @param  string|null $disk
      * @param  string|null $path
      * @return void
@@ -44,11 +44,15 @@ class Resizer
 
         $this->queueIt = $config->get('resizer.queue', false);
 
-        static::sizes($config->get('resizer.sizes'));
+        $this->formatter = $config->get('resizer.format');
+
+        if ($config->has('resizer.sizes')) {
+            static::sizes($config->get('resizer.sizes'));
+        }
     }
 
     /**
-     * Get or set the sizes
+     * Get or set the sizes.
      *
      * @param  array|null $sizes
      * @return array
@@ -76,7 +80,7 @@ class Resizer
     /**
      * Do the resizing for the Resizable images sizes
      *
-     * @param  \Flashtag\Data\Resizable $entity
+     * @param  \lagbox\Resizer\Resizable $entity
      * @return void
      */
     public function doIt(Resizable $entity)
@@ -94,7 +98,7 @@ class Resizer
                 $this->save($image, $filename);
             }
 
-            $entity->{$size} = $filename;
+            $entity->setSize($size, $filename);
         }
 
         $entity->save();
@@ -125,7 +129,7 @@ class Resizer
     }
 
     /**
-     * Save the Image to disk
+     * Save the Image to disk.
      *
      * @param  \Intervention\Image\Image $img
      * @param  string $name
@@ -140,14 +144,25 @@ class Resizer
     }
 
 
+    /**
+     * Handle the upload of a file.
+     *
+     * @param  \Symfony\Component\HttpFoundation\File\UploadedFile $file
+     * @param  string|null $filename
+     * @return string
+     */
     public function handleUpload(UploadedFile $file, $filename = null)
     {
         if (is_null($filename)) {
-            $filename = $file->hashName();
+            if (method_exists($file, 'hashName')) {
+                $filename = $file->hashName();
+            } else {
+                $filename = md5_file($file->path()).'.'.$file->extension();
+            }
         }
 
         $this->disk->put(
-            $path .'/'. $filename,
+            $this->path .'/'. $filename,
             file_get_contents($file->getRealPath())
         );
 
@@ -155,9 +170,9 @@ class Resizer
     }
 
     /**
-     * Format the sizes to a standard format
+     * Format the sizes to a standard format.
      *
-     * @return void
+     * @return array
      */
     protected function formatSizes()
     {
@@ -183,16 +198,20 @@ class Resizer
     }
 
     /**
-     * Format the Filename for the entity and size
+     * Format the filename for the entity and size.
      *
      * @param  string $original Original filename
      * @param  string $size
-     * @return string
+     * @return string The formatted filename
      */
     protected function formatFileName($original, $size)
     {
         $extension = pathinfo($original, PATHINFO_EXTENSION);
         $filename = pathinfo($original, PATHINFO_FILENAME);
+
+        if ($this->formatter) {
+            return call_user_func_array($this->formatter, [$filename, $extension, $size]);
+        }
 
         return "{$filename}__{$size}.{$extension}";
     }

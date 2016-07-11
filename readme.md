@@ -2,9 +2,13 @@
 
 # Under development
 
-Do not even think about using this :).
+Do not even think about using this yet :).
 
 Just playing with some ideas here.
+
+## Requirements
+
+This is designed for `Laravel >= 5.2`.
 
 ## Eloquent Relationship
 

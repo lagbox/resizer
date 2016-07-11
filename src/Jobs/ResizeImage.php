@@ -1,10 +1,10 @@
 <?php
 
-namespace lagbox\resizer\Jobs;
+namespace lagbox\Resizer\Jobs;
 
-use lagbox\resizer\Resizer;
+use lagbox\Resizer\Resizer;
 use Illuminate\Bus\Queueable;
-use lagbox\resizer\Resizable;
+use lagbox\Resizer\Resizable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;

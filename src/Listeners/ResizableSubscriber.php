@@ -1,32 +1,34 @@
 <?php
 
-namespace lagbox\resizer\Listeners;
+namespace lagbox\Resizer\Listeners;
 
-use lagbox\resizer\Resizer;
-use lagbox\resizer\Resizable;
-use lagbox\resizer\Jobs\ResizeImage;
+use lagbox\Resizer\Resizer;
+use lagbox\Resizer\Resizable;
+use lagbox\Resizer\Jobs\ResizeImage;
+use Illuminate\Contracts\Bus\Dispatcher;
 
 class ResizableSubscriber
 {
     /**
-     * \Flashtag\Data\Services\Resizer
+     * \lagbox\resizer\Resizer
      */
     protected $resizer;
 
     /**
-     * @param  \Flashtag\Data\Services\Resizer $resizer
+     * @param  \lagbox\Resizer\Resizer $resizer
+     * @param  \Iluminate\Contracts\Bus\Dispatcher $dispatcher
      * @return void
      */
-    public function __construct(Resizer $resizer)
+    public function __construct(Resizer $resizer, Dispatcher $dispatcher)
     {
         $this->resizer = $resizer;
+        $this->dispatcher = $dispatcher;
     }
 
     public function onCreate(Resizable $model)
     {
         if ($this->resizer->queuIt()) {
-            // change to dispatcher class
-            dispatch(new ResizeImage($model));
+            $this->dispatcher->dispatch(new ResizeImage($model));
         } else {
             $this->resizer->doIt($model);
         }
@@ -42,15 +44,11 @@ class ResizableSubscriber
 
         // get sizes and add original to it
 
-        $sizes = array_keys($this->resizer->sizes());
+        $sizes = (array) $model->sizes;
 
-        array_unshift($sizes, 'original');
+        array_unshift($sizes, $model->original);
 
-        foreach ($sizes as $size) {
-            $file = $model->{$size};
-
-            if (! $file) { continue; }
-
+        foreach ($sizes as $file) {
             $img = $path .'/'. $file;
 
             if ($storage->has($img)) {
@@ -62,7 +60,7 @@ class ResizableSubscriber
     public function subscribe($events)
     {
         $events->listen(
-            'eloquent.deleting: '. Resizable::class,
+            'eloquent.deleted: '. Resizable::class,
             self::class .'@onDelete'
         );
 

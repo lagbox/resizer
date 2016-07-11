@@ -1,5 +1,5 @@
 {
-    "name": "lagbox/resizer",
+    "name": "lagbox/laravel-resizer",
     "description": "A simple resizer using Intervention and providing a model for the image.",
     "license": "MIT",
     "keywords": ["laravel", "image", "resizing"],
@@ -10,7 +10,14 @@
         }
     ],
     "require": {
-        "php": ">=5.6",
+        "php": ">=5.5.9",
+        "illuminate/config": "5.1.*|5.2.*|5.3.*",
+        "illuminate/contracts": "5.1.*|5.2.*|5.3.*",
+        "illuminate/support": "5.1.*|5.2.*|5.3.*",
+        "illuminate/database": "5.1.*|5.2.*|5.3.*",
+        "illuminate/events": "5.1.*|5.2.*|5.3.*",
+        "illuminate/filesystem": "5.1.*|5.2.*|5.3.*",
+        "illuminate/queue": "5.1.*|5.2.*|5.3.*",
         "intervention/image": "^2.3"
     },
     "require-dev": {
@@ -18,7 +25,7 @@
     },
     "autoload": {
         "psr-4": {
-            "lagbox\\settings\\": "src"
+            "lagbox\\Resizer\\": "src"
         }
     }
 }

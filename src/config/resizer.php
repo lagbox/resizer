@@ -18,4 +18,8 @@ return [
         'xs' => 80,
     ],
     'queue' => false,
+
+    'format' => function ($filename, $extension, $size) {
+        return "{$filename}__{$size}.{$extension}";
+    },
 ];
