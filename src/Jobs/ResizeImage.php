@@ -13,7 +13,7 @@ class ResizeImage implements ShouldQueue
 {
     use InteractsWithQueue, SerializesModels, Queueable;
 
-    protected $resizable
+    protected $resizable;
 
     public function __construct(Resizable $resizable)
     {
@@ -22,6 +22,6 @@ class ResizeImage implements ShouldQueue
 
     public function handle(Resizer $resizer)
     {
-        $this->resizer->doIt($this->resizable);
+        $resizer->doIt($this->resizable);
     }
 }

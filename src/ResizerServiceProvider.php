@@ -5,34 +5,39 @@ namespace lagbox\Resizer;
 use lagbox\Resizer\Resizer;
 use lagbox\Resizer\Resizable;
 use Illuminate\Support\ServiceProvider;
-use lagbox\Resizer\Listener\ResizableSubscriber;
+use Intervention\Image\ImageServiceProvider;
+use lagbox\Resizer\Listeners\ResizableObserver;
 
 class ResizerServiceProvider extends ServiceProvider
 {
     public function boot()
     {
-        $this->app['events']->subscribe(ResizableSubscriber::class);
-
         Resizable::$resizer = $this->app['resizer'];
 
-        $this->publishes();
+        Resizable::observe($this->app[ResizableObserver::class]);
+
+        $this->publish();
     }
 
     public function register()
     {
-        $this->app->bind('resizer', Resizer::class);
+        $this->app->singleton('resizer', function ($app) {
+            return new Resizer($app->filesystem, $app->config->get('resizer'));
+        });
 
         $this->app->alias('resizer', Resizer::class);
+
+        $this->app->register(ImageServiceProvider::class);
     }
 
-    protected function publishes()
+    protected function publish()
     {
         $this->publishes([
-            __DIR__.'/../config/resizer.php' => config_path('resizer.php')
+            __DIR__.'/config/resizer.php' => config_path('resizer.php')
         ], 'config');
 
         $this->publishes([
-            __DIR__.'/../database/migrations/' => database_path('migrations')
+            __DIR__.'/database/migrations/' => database_path('migrations')
         ], 'migrations');
     }
 }

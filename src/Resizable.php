@@ -14,7 +14,7 @@ class Resizable extends Model
     ];
 
     protected $casts = [
-        'sizes' => 'object',
+        'sizes' => 'array',
     ];
 
     /**
@@ -33,13 +33,22 @@ class Resizable extends Model
      * @param  string $name The size
      * @return string|null
      */
-    public function getSize($name)
+    public function getSize($name, $webpath = false)
     {
-        if (isset($this->sizes->{$name})) {
-            return $this->sizes->{$name};
+        $webpath = $webpath ? static::$resizer->publicPath() : '';
+
+        if (isset($this->sizes[$name])) {
+            return $webpath . $this->sizes[$name];
+        } elseif ($name == 'original') {
+            return $webpath . $this->attributes['original'];
         }
 
         return null;
+    }
+
+    public function getSizes()
+    {
+        return array_merge(['original'], array_keys($this->sizes));
     }
 
     /**
@@ -50,7 +59,9 @@ class Resizable extends Model
      */
     public function setSize($size, $file)
     {
-        $this->sizes->{$size} = $file;
+        $sizes = $this->sizes;
+        $sizes[$size] = $file;
+        $this->sizes = $sizes;
     }
 
     /**

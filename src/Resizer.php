@@ -2,8 +2,12 @@
 
 namespace lagbox\Resizer;
 
+use Illuminate\Support\Arr;
 use lagbox\Resizer\Resizable;
+use Illuminate\Support\Facades\App;
+use lagbox\Resizer\Jobs\ResizeImage;
 use Intervention\Image\Facades\Image;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Filesystem\Factory as Storage;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -26,28 +30,30 @@ class Resizer
     ];
 
     /**
-     * @param  string|null $disk
-     * @param  string|null $path
+     * @param  \Illuminate\Contracts\Filesystem\Factory $storage
+     * @param  array $config
      * @return void
      */
-    public function __construct(Config $config, Storage $storage)
+    public function __construct(Storage $storage, $config = [])
     {
-        $configs = $config->get('resizer.storage');
-
-        $default = $configs['default'];
-
-        $this->disk = $storage->disk(
-            $configs['disks'][$default]['disk']
+        $disk = Arr::get(
+            $config,
+            'storage.disks.'. $config['storage']['default'],
+            'public'
         );
 
-        $this->path = $configs['disks'][$default]['path'] ?? 'images';
+        $this->disk = $storage->disk($disk['disk']);
 
-        $this->queueIt = $config->get('resizer.queue', false);
+        $this->path = Arr::get($disk, 'path', 'images');
 
-        $this->formatter = $config->get('resizer.format');
+        $this->publicPath = Arr::get($disk, 'public_path', 'storage/images');
 
-        if ($config->has('resizer.sizes')) {
-            static::sizes($config->get('resizer.sizes'));
+        $this->queueIt = Arr::get($config, 'queue', false);
+
+        $this->formatter = Arr::get($config, 'format');
+
+        if (isset($config['sizes'])) {
+            static::sizes($config['sizes']);
         }
     }
 
@@ -62,19 +68,55 @@ class Resizer
         return $sizes ? static::$sizes = $sizes : static::$sizes;
     }
 
-    public function getDisk()
+    /**
+     * Get the Filesystem disk.
+     *
+     * @return \Illuminate\Filesystem\FilesystemAdapter
+     */
+    public function disk()
     {
         return $this->disk;
     }
 
-    public function getPath()
+    /**
+     * Get the path for use with the disk.
+     *
+     * @return string
+     */
+    public function path()
     {
         return $this->path;
     }
 
+    public function publicPath()
+    {
+        return rtrim($this->publicPath, '/') .'/';
+    }
+
+    /**
+     * Use of queue for resizing.
+     *
+     * @return bool
+     */
     public function queueIt()
     {
         return $this->queueIt;
+    }
+
+    /**
+     * Do the resizing for the Resizable images sizes
+     *
+     * @param  \lagbox\Resizer\Resizable $entity
+     * @return void
+     */
+    public function resizing(Resizable $model)
+    {
+        if ($this->queueIt()) {
+            $dispatcher = App::make(Dispatcher::class)
+                ->dispatch(new ResizeImage($model));
+        } else {
+            $this->doIt($model);
+        }
     }
 
     /**
@@ -111,7 +153,7 @@ class Resizer
      * @param  array $dems  the dimensions
      * @return bool
      */
-    protected function resize($img, $dems)
+    public function resize($img, $dems)
     {
         // check if there is a need to resize based on dimensions passed
         if ($img->height() < $dems['height'] && $img->width() < $dems['width']) {
@@ -136,7 +178,7 @@ class Resizer
      * @param  string|null $path
      * @return void
      */
-    protected function save($img, $name, $path = null)
+    public function save($img, $name, $path = null)
     {
         $path = $path ?: $this->path;
 
@@ -159,6 +201,8 @@ class Resizer
             } else {
                 $filename = md5_file($file->path()).'.'.$file->extension();
             }
+        } elseif (pathinfo($filename, PATHINFO_EXTENSION) == '') {
+            $filename .= '.'. $file->extension();
         }
 
         $this->disk->put(
@@ -213,6 +257,6 @@ class Resizer
             return call_user_func_array($this->formatter, [$filename, $extension, $size]);
         }
 
-        return "{$filename}__{$size}.{$extension}";
+        return "{$filename}_{$size}.{$extension}";
     }
 }
