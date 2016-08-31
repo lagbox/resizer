@@ -4,24 +4,69 @@ namespace lagbox\Resizer;
 
 use Illuminate\Support\Arr;
 use lagbox\Resizer\Resizable;
-use Illuminate\Support\Facades\App;
 use lagbox\Resizer\Jobs\ResizeImage;
 use Intervention\Image\Facades\Image;
+use Illuminate\Foundation\Application;
 use Illuminate\Contracts\Bus\Dispatcher;
-use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Filesystem\Factory as Storage;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class Resizer
 {
+    /**
+     * The Filesystem instance
+     *
+     * @var \Illuminate\Contracts\Filesystem\Factory
+     */
+    protected $filesystem;
+
+    /**
+     * The queue dispatcher instance
+     *
+     * @var \Illuminate\Contracts\Bus\Dispatcher
+     */
+    protected $dispatcher;
+
+    /**
+     * Storage path
+     *
+     * @var string
+     */
     protected $path;
 
+    /**
+     * Public URL path
+     *
+     * @var string
+     */
+    protected $publicPath;
+
+    /**
+     * The Storage Disk to use
+     *
+     * @var \Illuminate\Filesystem\FilesystemAdapter
+     */
     protected $disk;
 
+    /**
+     * Should the resizing happen as a queue job
+     *
+     * @var bool
+     */
     protected $queueIt;
 
+    /**
+     * The custom formatter for the naming of files
+     *
+     * @var callable|\Closure
+     */
     protected $formatter;
 
+    /**
+     * The preconfigured sizes to use for resizing
+     *
+     * @var array
+     */
     public static $sizes = [
         'lg' => 600,
         'md' => 400,
@@ -31,30 +76,61 @@ class Resizer
 
     /**
      * @param  \Illuminate\Contracts\Filesystem\Factory $storage
+     * @param  Illuminate\Contracts\Bus\Dispatcher $dispatcher
      * @param  array $config
      * @return void
      */
-    public function __construct(Storage $storage, $config = [])
+    public function __construct(Storage $storage, Dispatcher $dispatcher, $config = [])
     {
-        $disk = Arr::get(
-            $config,
-            'storage.disks.'. $config['storage']['default'],
-            'public'
-        );
+        $this->filesystem = $storage;
 
-        $this->disk = $storage->disk($disk['disk']);
+        $this->dispatcher = $dispatcher;
 
-        $this->path = Arr::get($disk, 'path', 'images');
+        if (empty($config)) {
+            throw new \Exception('Resizer config is not set.');
+        }
 
-        $this->publicPath = Arr::get($disk, 'public_path', 'storage/images');
+        $this->setFromConfig($config);
+    }
 
-        $this->queueIt = Arr::get($config, 'queue', false);
+    /**
+     * Setup from config.
+     *
+     * @param  array $config The config array
+     * @return void
+     */
+    protected function setFromConfig($config)
+    {
+        $this->config = $config;
+
+        $this->useDisk($config['storage']['default']);
+
+        $this->queueIt = (bool) Arr::get($config, 'queue', false);
 
         $this->formatter = Arr::get($config, 'format');
 
         if (isset($config['sizes'])) {
             static::sizes($config['sizes']);
         }
+    }
+
+    /**
+     * Use a configured disk by name
+     *
+     * @param  string $name The name given in your resizer config
+     * @return void
+     */
+    public function useDisk($name)
+    {
+        $disk = Arr::get(
+            $this->config, 'storage.disks.'. $name, 'public'
+        );
+
+        $this->disk = $this->filesystem->disk($disk['disk']);
+
+        $this->path = Arr::get($disk, 'path', 'images');
+
+        $this->publicPath = Arr::get($disk, 'public_path', 'storage/images');
     }
 
     /**
@@ -88,6 +164,11 @@ class Resizer
         return $this->path;
     }
 
+    /**
+     * Get the public path for use with urls.
+     *
+     * @return string
+     */
     public function publicPath()
     {
         return rtrim($this->publicPath, '/') .'/';
@@ -112,8 +193,7 @@ class Resizer
     public function resizing(Resizable $model)
     {
         if ($this->queueIt()) {
-            $dispatcher = App::make(Dispatcher::class)
-                ->dispatch(new ResizeImage($model));
+            $this->app[Dispatcher::class]->dispatch(new ResizeImage($model));
         } else {
             $this->doIt($model);
         }
@@ -191,23 +271,18 @@ class Resizer
      *
      * @param  \Symfony\Component\HttpFoundation\File\UploadedFile $file
      * @param  string|null $filename
-     * @return string
+     * @return string The filename of the uploaded file
      */
     public function handleUpload(UploadedFile $file, $filename = null)
     {
         if (is_null($filename)) {
-            if (method_exists($file, 'hashName')) {
-                $filename = $file->hashName();
-            } else {
-                $filename = md5_file($file->path()).'.'.$file->extension();
-            }
+            $filename = md5_file($file->path()) .'.'. $file->extension();
         } elseif (pathinfo($filename, PATHINFO_EXTENSION) == '') {
             $filename .= '.'. $file->extension();
         }
 
         $this->disk->put(
-            $this->path .'/'. $filename,
-            file_get_contents($file->getRealPath())
+            $this->path .'/'. $filename, file_get_contents($file->getRealPath())
         );
 
         return $filename;
@@ -258,5 +333,28 @@ class Resizer
         }
 
         return "{$filename}_{$size}.{$extension}";
+    }
+
+    /**
+     * Delete a Resizable Image.
+     *
+     * @param  \lagbox\Resizer\Resizable $entity
+     * @return void
+     */
+    public function delete(Resizable $entity)
+    {
+        // get the sizes
+        $sizes = (array) $entity->sizes;
+
+        array_unshift($sizes, $model->original);
+
+        // spin through each size
+        foreach ($sizes as $file) {
+            $img = $path .'/'. $file;
+
+            if ($this->disk->has($img)) {
+                $this->disk->delete($img);
+            }
+        }
     }
 }

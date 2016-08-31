@@ -33,8 +33,9 @@ return [
 
     // a closure that returns the formatted name of an image for a certain size
     // $filename, $extension, $size will be passed
+    /*
     'format' => function ($filename, $extension, $size) {
         return "{$filename}_{$size}.{$extension}";
     },
-
+    */
 ];

@@ -1,10 +1,8 @@
 # Simple Image Resizer via Intervention
 
-# Under development
+Under development.
 
-Do not even think about using this yet :).
-
-Just playing with some ideas here.
+This is mainly for resizing multiple sizes for a single image. You create a Resizeable (Image) model and the event system will resize it into the needed sizes you have setup in your configuration.
 
 ## Requirements
 
@@ -76,33 +74,38 @@ public function store(Request $request, Resizer $resizer)
 
 You can use `lagbox\Resizer\Traits\HasResizableImage` trait if you would like a `addImage($filename)` method and a `getResizableName()` method. By default the `getResizableName` method is simply:
 
-    return $this->id .'-'. $this->slug;
+```php
+return $this->id .'-'. $this->slug;
+```
 
 You can override this method on your model to change the format of the filename used for the Resizable Image associated with your model.
 
 If you have named your relationship method something other than `image` you can set a parameter on your model to adjust for that.
 
-    protected $resizableName = 'images';
+```php
+protected $resizableName = 'images';
 
-    // or
+// or
 
-    protected $resizableName = 'photo';
+protected $resizableName = 'photo';
+```
 
 ### Upload and Trait methods
 
 These methods can be used to help you with the upload and saving process.
 
-    public function store(Request $request, Resizer $resizer)
-    {
-        $post = Post::create($request->all());
+```php
+public function store(Request $request, Resizer $resizer)
+{
+    $post = Post::create($request->all());
 
-        $file = $request->file('image');
+    $file = $request->file('image');
 
-        $filename = $resizer->handleUpload($file, $post->getResizableName());
-
-        $image = $post->addImage($filename);
-    }
-
+    $image = $post->addImage(
+        $resizer->handleUpload($file, $post->getResizableName())
+    );
+}
+```
 
 ## Resizing
 

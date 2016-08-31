@@ -22,7 +22,7 @@ class Resizable extends Model
      *
      * @return \Illuminate\Database\Eloquent\Relation\MorphTo
      */
-    public function resizeable()
+    public function resizable()
     {
         return $this->morphTo();
     }
@@ -31,6 +31,7 @@ class Resizable extends Model
      * Return the filename for the size or null.
      *
      * @param  string $name The size
+     * @param  bool $webpath
      * @return string|null
      */
     public function getSize($name, $webpath = false)
@@ -42,8 +43,6 @@ class Resizable extends Model
         } elseif ($name == 'original') {
             return $webpath . $this->attributes['original'];
         }
-
-        return null;
     }
 
     public function getSizes()
@@ -60,7 +59,9 @@ class Resizable extends Model
     public function setSize($size, $file)
     {
         $sizes = $this->sizes;
+
         $sizes[$size] = $file;
+
         $this->sizes = $sizes;
     }
 

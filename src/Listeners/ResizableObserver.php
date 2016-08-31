@@ -8,7 +8,7 @@ use lagbox\Resizer\Jobs\ResizeImage;
 class ResizableObserver
 {
     /**
-     * @param \lagbox\Resizer\Resizer $resizer
+     * @param  \lagbox\Resizer\Resizer $resizer
      */
     public function __construct(Resizer $resizer)
     {
@@ -16,33 +16,16 @@ class ResizableObserver
     }
 
     /**
-     * @param  lagbox\Resizer\Resizable $model
+     * @param  \lagbox\Resizer\Resizable $model
      * @return void
      */
     public function deleted($model)
     {
-        // get the disk instance
-        $storage = $this->resizer->getDisk();
-
-        // get the path for the disk
-        $path = $this->resizer->getPath();
-
-        // get sizes and add original to it
-        $sizes = (array) $model->sizes;
-
-        array_unshift($sizes, $model->original);
-
-        foreach ($sizes as $file) {
-            $img = $path .'/'. $file;
-
-            if ($storage->has($img)) {
-                $storage->delete($img);
-            }
-        }
+        $this->resizer->delete($model);
     }
 
     /**
-     * @param  lagbox\Resizer\Resizable $model
+     * @param  \lagbox\Resizer\Resizable $model
      * @return void
      */
     public function creating($model)
@@ -53,7 +36,7 @@ class ResizableObserver
     }
 
     /**
-     * @param  lagbox\Resizer\Resizable $model
+     * @param  \lagbox\Resizer\Resizable $model
      * @return void
      */
     public function created($model)
